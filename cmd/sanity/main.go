@@ -58,7 +58,7 @@ func main() {
 		for i, v := range emb {
 			emb32[i] = float32(v)
 		}
-		err = s.Upsert(id, rawText, emb32)
+		err = s.Upsert(argus.UpsertItem{ID: id, RawText: rawText, Embedding: emb32})
 		if err != nil {
 			slog.Error("failed to upsert embedding", "error", err, "id", id, "rawText", rawText, "emb", emb32)
 			os.Exit(1)

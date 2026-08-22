@@ -17,7 +17,7 @@ func TestUpsert(t *testing.T) {
 	emb := []float32{1, 0, 0}
 	rawText := "Hello world!"
 
-	err = s.Upsert(1, rawText, emb)
+	err = s.Upsert(UpsertItem{1, rawText, emb})
 	if err != nil {
 		t.Fatalf("Upsert failed: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestBatchUpsert(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run("upsert/"+tc.text, func(t *testing.T) {
-			err := s.Upsert(tc.id, tc.text, tc.emb)
+			err := s.Upsert(UpsertItem{tc.id, tc.text, tc.emb})
 			if err != nil {
 				t.Fatalf("Upsert failed: %v", err)
 			}
@@ -111,7 +111,7 @@ func TestCount(t *testing.T) {
 
 	for _, tc := range initialTests {
 		t.Run("upsert/"+tc.text, func(t *testing.T) {
-			err := s.Upsert(tc.id, tc.text, tc.emb)
+			err := s.Upsert(UpsertItem{tc.id, tc.text, tc.emb})
 			if err != nil {
 				t.Fatalf("Upsert failed: %v", err)
 			}
@@ -129,7 +129,7 @@ func TestCount(t *testing.T) {
 	emb := []float32{-1, 0, 0}
 	rawText := "!dlrow olleH"
 
-	err = s.Upsert(1, rawText, emb)
+	err = s.Upsert(UpsertItem{1, rawText, emb})
 	if err != nil {
 		t.Fatalf("Upsert failed: %v", err)
 	}

@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package argus;
+
+option go_package = "github.com/aepii/argus/pb";
+
+service ShardService {
+  rpc Upsert(UpsertRequest) returns (UpsertResponse);
+  rpc UpsertBatch(UpsertBatchRequest) returns (UpsertBatchResponse);
+  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Count(CountRequest) returns (CountResponse);
+}
+
+message UpsertItem {
+  int64          id        = 1;
+  string         raw_text  = 2;
+  repeated float embedding = 3;
+}
+
+message SearchResult {
+  string raw_text         = 1;
+  double similarity_score = 2;
+}
+
+message UpsertRequest {
+  UpsertItem item = 1;
+}
+
+message UpsertResponse {}
+
+message UpsertBatchRequest {
+  repeated UpsertItem items = 1;
+}
+
+message UpsertBatchResponse {}
+
+message SearchRequest {
+  repeated float embedding = 1;
+  int32          top_k     = 2;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
+}
+
+message CountRequest {}
+
+message CountResponse {
+  int64 count = 1;
+}

@@ -15,7 +15,6 @@ func init() {
 	sqlite_vec.Auto()
 }
 
-// Vector store
 type VectorStore struct {
 	db  *sql.DB
 	mu  sync.Mutex
@@ -23,14 +22,12 @@ type VectorStore struct {
 }
 
 func NewVectorStore(path string, dim uint16) (*VectorStore, error) {
-	// Open a connection
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		slog.Error("failed to open connection", "error", err)
 		return nil, err
 	}
 
-	// Query vec_version
 	var version string
 	err = db.QueryRow(`SELECT vec_version()`).Scan(&version)
 	if err != nil {
@@ -40,7 +37,6 @@ func NewVectorStore(path string, dim uint16) (*VectorStore, error) {
 	}
 	slog.Info("sqlite-vec loaded", "version", version)
 
-	// Create items table
 	createItems :=
 		`CREATE TABLE IF NOT EXISTS items (
 			item_id 	INTEGER 	PRIMARY KEY,
@@ -53,7 +49,6 @@ func NewVectorStore(path string, dim uint16) (*VectorStore, error) {
 		return nil, err
 	}
 
-	// Create vec_items virtual table
 	createVecItems := fmt.Sprintf(
 		`CREATE VIRTUAL TABLE IF NOT EXISTS vec_items
 			USING vec0(embedding float[%d] distance_metric=cosine)
@@ -66,19 +61,22 @@ func NewVectorStore(path string, dim uint16) (*VectorStore, error) {
 		return nil, err
 	}
 
-	// Return VectorStore
 	return &VectorStore{
 		db:  db,
 		dim: dim,
 	}, nil
 }
 
-func (s *VectorStore) Upsert(id int64, text string, emb []float32) error {
-	// Hold lock
+type UpsertItem struct {
+	ID        int64
+	RawText   string
+	Embedding []float32
+}
+
+func (s *VectorStore) Upsert(item UpsertItem) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		slog.Error("failed to start transaction", "error", err)
@@ -90,17 +88,19 @@ func (s *VectorStore) Upsert(id int64, text string, emb []float32) error {
 		}
 	}()
 
-	// Upsert item
+	id := item.ID
+	rawText := item.RawText
+	emb := item.Embedding
+
 	upsertItem := `INSERT INTO items (item_id, raw_text) VALUES (?, ?)
 					ON CONFLICT (item_id)
 					DO UPDATE SET raw_text = EXCLUDED.raw_text`
-	_, err = tx.Exec(upsertItem, id, text)
+	_, err = tx.Exec(upsertItem, id, rawText)
 	if err != nil {
-		slog.Error("failed to upsert item", "error", err, "id", id, "text", text)
+		slog.Error("failed to upsert item", "error", err, "id", id, "text", rawText)
 		return err
 	}
 
-	// Upsert embedding
 	embBytes, err := sqlite_vec.SerializeFloat32(emb)
 	if err != nil {
 		slog.Error("failed to serialize embedding", "error", err, "emb", emb)
@@ -121,21 +121,71 @@ func (s *VectorStore) Upsert(id int64, text string, emb []float32) error {
 		return err
 	}
 
-	// Commit transaction
 	return tx.Commit()
 }
 
-// Search result
-type Result struct {
+func (s *VectorStore) UpsertBatch(items []UpsertItem) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		slog.Error("failed to start transaction", "error", err)
+		return err
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			slog.Error("failed to rollback transaction", "error", err)
+		}
+	}()
+
+	for _, item := range items {
+		id := item.ID
+		rawText := item.RawText
+		emb := item.Embedding
+
+		upsertItem := `INSERT INTO items (item_id, raw_text) VALUES (?, ?)
+						ON CONFLICT (item_id)
+						DO UPDATE SET raw_text = EXCLUDED.raw_text`
+		_, err = tx.Exec(upsertItem, id, rawText)
+		if err != nil {
+			slog.Error("failed to upsert item", "error", err, "id", id, "text", rawText)
+			return err
+		}
+
+		embBytes, err := sqlite_vec.SerializeFloat32(emb)
+		if err != nil {
+			slog.Error("failed to serialize embedding", "error", err, "emb", emb)
+			return err
+		}
+
+		deleteEmbedding := `DELETE FROM vec_items WHERE (rowid) = ?`
+		_, err = tx.Exec(deleteEmbedding, id)
+		if err != nil {
+			slog.Error("failed to delete embedding", "error", err, "id", id)
+			return err
+		}
+
+		insertEmbedding := `INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)`
+		_, err = tx.Exec(insertEmbedding, id, embBytes)
+		if err != nil {
+			slog.Error("failed to upsert vec_item", "error", err, "id", id, "emb", emb)
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+type SearchResult struct {
 	RawText         string
 	SimilarityScore float64
 }
 
-func (s *VectorStore) Search(emb []float32, topK int) ([]Result, error) {
+func (s *VectorStore) Search(emb []float32, topK int) ([]SearchResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Search for embedding
 	embBytes, err := sqlite_vec.SerializeFloat32(emb)
 	if err != nil {
 		slog.Error("failed to serialize embedding", "error", err, "emb", emb)
@@ -159,10 +209,9 @@ func (s *VectorStore) Search(emb []float32, topK int) ([]Result, error) {
 	}
 	defer rows.Close()
 
-	// Aggregate results
-	var results []Result
+	var results []SearchResult
 	for rows.Next() {
-		var result Result
+		var result SearchResult
 		if err := rows.Scan(&result.RawText, &result.SimilarityScore); err != nil {
 			return nil, err
 		}
