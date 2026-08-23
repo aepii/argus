@@ -8,9 +8,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aepii/argus"
 	"github.com/aepii/argus/internal/embed"
+	"github.com/aepii/argus/pb"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Config struct {
@@ -19,8 +21,6 @@ type Config struct {
 	apiVersion string
 	model      string
 	dim        uint16
-	dbFile     string
-	dbPath     string
 }
 
 func loadConfig() (*Config, error) {
@@ -42,8 +42,6 @@ func loadConfig() (*Config, error) {
 		apiVersion: os.Getenv("AZURE_OPENAI_API_VERSION"),
 		model:      os.Getenv("AZURE_OPENAI_MODEL"),
 		dim:        dim16,
-		dbFile:     os.Getenv("DB_FILE"),
-		dbPath:     os.Getenv("DB_PATH"),
 	}, nil
 }
 
@@ -54,13 +52,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	s, err := argus.NewVectorStore(config.dbFile, config.dim)
+	address := os.Getenv("ADDRESS")
+	port := os.Getenv("PORT")
+	target := address + ":" + port
+
+	conn, err := grpc.NewClient(
+		target,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
-		slog.Error("failed to create vector store", "error", err)
+		slog.Error("failed to create client", "error", err)
 		os.Exit(1)
 	}
+	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	slog.Info("successfully initialized client connection", "target", target)
+
+	client := pb.NewShardServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	embedClient, err := embed.NewClient(config.endpoint, config.apiKey, config.apiVersion, config.model, config.dim)
@@ -69,42 +79,43 @@ func main() {
 		os.Exit(1)
 	}
 
-	var strings = []string{"Hello World!", "Bye World!", "The sky is blue!", "I love dogs!", "I love cats!", "I hate animals!", "I feel horrible typing that previous sentence.", "The sky is really green!"}
-
-	embs, err := embedClient.EmbedBatch(ctx, strings)
+	var rawTexts = []string{"Hello World!", "Bye World!", "The sky is blue!", "I love dogs!", "I love cats!", "I hate animals!", "I feel horrible typing that previous sentence.", "The sky is really green!"}
+	embs, err := embedClient.EmbedBatch(ctx, rawTexts)
 	if err != nil {
 		slog.Error("failed to create embedding", "error", err)
 		os.Exit(1)
 	}
 
-	for id, emb := range embs {
-		id := int64(id)
-		rawText := strings[id]
-		err = s.Upsert(argus.UpsertItem{ID: id, RawText: rawText, Embedding: emb})
-		if err != nil {
-			slog.Error("failed to upsert embedding", "error", err, "id", id, "rawText", rawText, "emb", emb)
-			os.Exit(1)
-		}
+	pbItems := make([]*pb.UpsertItem, len(embs))
+	for i, emb := range embs {
+		pbItems[i] = &pb.UpsertItem{Id: int64(i), RawText: rawTexts[i], Embedding: emb}
 	}
 
-	c, err := s.Count()
+	_, err = client.UpsertBatch(ctx, &pb.UpsertBatchRequest{Items: pbItems})
+	if err != nil {
+		slog.Error("failed to upsert batch", "error", err)
+		os.Exit(1)
+	}
+
+	res, err := client.Count(ctx, &pb.CountRequest{})
 	if err != nil {
 		slog.Error("failed to count", "error", err)
 		os.Exit(1)
 	}
-	fmt.Printf("count: %d\n", c)
+	fmt.Println(res.Count)
 
-	const searchString = "The sky is green!"
-	emb, err := embedClient.Embed(ctx, searchString)
+	rawText := "Hello Blue World!"
+	emb, err := embedClient.Embed(ctx, rawText)
 	if err != nil {
 		slog.Error("failed to create embedding", "error", err)
 		os.Exit(1)
 	}
 
-	res, err := s.Search(emb, 3)
+	search, err := client.Search(ctx, &pb.SearchRequest{Embedding: emb, TopK: 3})
 	if err != nil {
-		slog.Error("failed to search embedding", "error", err, "emb", emb)
+		slog.Error("failed to search", "error", err)
 		os.Exit(1)
 	}
-	fmt.Println(res)
+
+	fmt.Println(search.Results)
 }

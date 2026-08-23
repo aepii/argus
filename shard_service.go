@@ -2,6 +2,7 @@ package argus
 
 import (
 	"context"
+	"errors"
 
 	"github.com/aepii/argus/pb"
 	"google.golang.org/grpc/codes"
@@ -11,6 +12,16 @@ import (
 type ShardServer struct {
 	pb.UnimplementedShardServiceServer
 	store *VectorStore
+}
+
+func NewShardServer(store *VectorStore) (*ShardServer, error) {
+	if store == nil {
+		return nil, errors.New("store must be supplied")
+	}
+
+	return &ShardServer{
+		store: store,
+	}, nil
 }
 
 func (s *ShardServer) Upsert(ctx context.Context, req *pb.UpsertRequest) (*pb.UpsertResponse, error) {
