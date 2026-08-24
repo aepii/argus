@@ -19,7 +19,6 @@ type Config struct {
 	apiVersion string
 	model      string
 	dim        uint16
-	dbFile     string
 	dbPath     string
 }
 
@@ -42,7 +41,6 @@ func loadConfig() (*Config, error) {
 		apiVersion: os.Getenv("AZURE_OPENAI_API_VERSION"),
 		model:      os.Getenv("AZURE_OPENAI_MODEL"),
 		dim:        dim16,
-		dbFile:     os.Getenv("DB_FILE"),
 		dbPath:     os.Getenv("DB_PATH"),
 	}, nil
 }
@@ -54,13 +52,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	s, err := argus.NewVectorStore(config.dbFile, config.dim)
+	s, err := argus.NewVectorStore(config.dbPath, config.dim)
 	if err != nil {
 		slog.Error("failed to create vector store", "error", err)
 		os.Exit(1)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	embedClient, err := embed.NewClient(config.endpoint, config.apiKey, config.apiVersion, config.model, config.dim)
