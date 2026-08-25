@@ -21,10 +21,12 @@ type Config struct {
 	apiVersion string
 	model      string
 	dim        uint16
+	address    string
+	port       string
 }
 
-func loadConfig() (*Config, error) {
-	err := godotenv.Load()
+func loadConfig(filenames ...string) (*Config, error) {
+	err := godotenv.Load(filenames...)
 	if err != nil {
 		slog.Error("failed to load environment variables", "error", err)
 		return nil, err
@@ -42,18 +44,20 @@ func loadConfig() (*Config, error) {
 		apiVersion: os.Getenv("AZURE_OPENAI_API_VERSION"),
 		model:      os.Getenv("AZURE_OPENAI_MODEL"),
 		dim:        dim16,
+		address:    os.Getenv("ADDRESS"),
+		port:       os.Getenv("PORT"),
 	}, nil
 }
 
 func main() {
-	config, err := loadConfig()
+	config, err := loadConfig("../../.env")
 	if err != nil {
 		slog.Error("failed to load environment variables", "error", err)
 		os.Exit(1)
 	}
 
-	address := os.Getenv("ADDRESS")
-	port := os.Getenv("PORT")
+	address := config.address
+	port := config.port
 	target := address + ":" + port
 
 	conn, err := grpc.NewClient(
