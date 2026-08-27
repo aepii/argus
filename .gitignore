@@ -6,3 +6,4 @@ argus.code-workspace
 *.db
 .env
 *.exe
+.git

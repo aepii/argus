@@ -1,0 +1,26 @@
+# IDEs and local workspaces
+.vscode/
+argus.code-workspace
+
+# Documentation and scratchpads
+.docs/
+.scratch/
+CLAUDE.md
+
+# Secrets and environment configs
+.env
+.env.*
+
+# Local databases and compiled binaries
+*.db
+*.exe
+vendor/
+
+# Go testing and sanity files
+*_test.go
+sanity/
+
+# Docker meta files
+.dockerignore
+.gitignore
+.git

@@ -14,7 +14,7 @@ import (
 
 func main() {
 	err := godotenv.Load()
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		slog.Error("failed to load environment variables", "error", err)
 		os.Exit(1)
 	}
