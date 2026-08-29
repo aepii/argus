@@ -4,38 +4,31 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"strconv"
 
 	"github.com/aepii/argus"
+	"github.com/aepii/argus/internal/config"
 	"github.com/aepii/argus/pb"
-	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil && !os.IsNotExist(err) {
+	cfg, err := config.LoadServer("../../.env")
+	if err != nil {
 		slog.Error("failed to load environment variables", "error", err)
 		os.Exit(1)
 	}
 
-	port := os.Getenv("PORT")
+	port := cfg.Port
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		slog.Error("failed to start server", "error", err)
 		os.Exit(1)
 	}
 
-	path := os.Getenv("DB_PATH")
-	dim := os.Getenv("EMBEDDING_DIM")
-	dim64, err := strconv.ParseUint(dim, 10, 16)
-	if err != nil {
-		slog.Error("failed to convert string", "error", err, "dim", dim)
-		os.Exit(1)
-	}
-	dim16 := uint16(dim64)
+	path := cfg.DbPath
+	dim := cfg.EmbedDim
 
-	store, err := argus.NewVectorStore(path, dim16)
+	store, err := argus.NewVectorStore(path, dim)
 	if err != nil {
 		slog.Error("failed to create vector store", "error", err)
 		os.Exit(1)
