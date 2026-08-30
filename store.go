@@ -24,14 +24,12 @@ type VectorStore struct {
 func NewVectorStore(path string, dim uint16) (*VectorStore, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		slog.Error("failed to open connection", "error", err)
 		return nil, err
 	}
 
 	var version string
 	err = db.QueryRow(`SELECT vec_version()`).Scan(&version)
 	if err != nil {
-		slog.Error("failed to query vec_version", "error", err)
 		db.Close()
 		return nil, err
 	}
@@ -44,7 +42,6 @@ func NewVectorStore(path string, dim uint16) (*VectorStore, error) {
 		)`
 	_, err = db.Exec(createItems)
 	if err != nil {
-		slog.Error("failed to create items table", "error", err)
 		db.Close()
 		return nil, err
 	}
@@ -56,7 +53,6 @@ func NewVectorStore(path string, dim uint16) (*VectorStore, error) {
 		dim)
 	_, err = db.Exec(createVecItems)
 	if err != nil {
-		slog.Error("failed to create vec_items virtual table", "error", err)
 		db.Close()
 		return nil, err
 	}
@@ -79,7 +75,6 @@ func (s *VectorStore) Upsert(item UpsertItem) error {
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		slog.Error("failed to start transaction", "error", err)
 		return err
 	}
 	defer func() {
@@ -97,27 +92,23 @@ func (s *VectorStore) Upsert(item UpsertItem) error {
 					DO UPDATE SET raw_text = EXCLUDED.raw_text`
 	_, err = tx.Exec(upsertItem, id, rawText)
 	if err != nil {
-		slog.Error("failed to upsert item", "error", err, "id", id, "text", rawText)
 		return err
 	}
 
 	embBytes, err := sqlite_vec.SerializeFloat32(emb)
 	if err != nil {
-		slog.Error("failed to serialize embedding", "error", err, "emb", emb)
 		return err
 	}
 
 	deleteEmbedding := `DELETE FROM vec_items WHERE (rowid) = ?`
 	_, err = tx.Exec(deleteEmbedding, id)
 	if err != nil {
-		slog.Error("failed to delete embedding", "error", err, "id", id)
 		return err
 	}
 
 	insertEmbedding := `INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)`
 	_, err = tx.Exec(insertEmbedding, id, embBytes)
 	if err != nil {
-		slog.Error("failed to upsert vec_item", "error", err, "id", id, "emb", emb)
 		return err
 	}
 
@@ -130,7 +121,6 @@ func (s *VectorStore) UpsertBatch(items []UpsertItem) error {
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		slog.Error("failed to start transaction", "error", err)
 		return err
 	}
 	defer func() {
@@ -149,27 +139,23 @@ func (s *VectorStore) UpsertBatch(items []UpsertItem) error {
 						DO UPDATE SET raw_text = EXCLUDED.raw_text`
 		_, err = tx.Exec(upsertItem, id, rawText)
 		if err != nil {
-			slog.Error("failed to upsert item", "error", err, "id", id, "text", rawText)
 			return err
 		}
 
 		embBytes, err := sqlite_vec.SerializeFloat32(emb)
 		if err != nil {
-			slog.Error("failed to serialize embedding", "error", err, "emb", emb)
 			return err
 		}
 
 		deleteEmbedding := `DELETE FROM vec_items WHERE (rowid) = ?`
 		_, err = tx.Exec(deleteEmbedding, id)
 		if err != nil {
-			slog.Error("failed to delete embedding", "error", err, "id", id)
 			return err
 		}
 
 		insertEmbedding := `INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)`
 		_, err = tx.Exec(insertEmbedding, id, embBytes)
 		if err != nil {
-			slog.Error("failed to upsert vec_item", "error", err, "id", id, "emb", emb)
 			return err
 		}
 	}
@@ -188,7 +174,6 @@ func (s *VectorStore) Search(emb []float32, topK int) ([]SearchResult, error) {
 
 	embBytes, err := sqlite_vec.SerializeFloat32(emb)
 	if err != nil {
-		slog.Error("failed to serialize embedding", "error", err, "emb", emb)
 		return nil, err
 	}
 
@@ -204,7 +189,6 @@ func (s *VectorStore) Search(emb []float32, topK int) ([]SearchResult, error) {
 						ORDER BY v.distance`
 	rows, err := s.db.Query(searchEmbedding, embBytes, topK)
 	if err != nil {
-		slog.Error("failed to search", "error", err, "emb", emb)
 		return nil, err
 	}
 	defer rows.Close()
@@ -232,7 +216,6 @@ func (s *VectorStore) Count() (int, error) {
 	countItems := `SELECT COUNT(*) FROM items`
 	err := s.db.QueryRow(countItems).Scan(&count)
 	if err != nil {
-		slog.Error("failed to count items", "error", err)
 		return 0, err
 	}
 

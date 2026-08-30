@@ -3,7 +3,6 @@ package embed
 import (
 	"context"
 	"errors"
-	"log/slog"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/azure"
@@ -56,7 +55,6 @@ func (c *Client) Embed(ctx context.Context, text string) ([]float32, error) {
 		},
 	)
 	if err != nil {
-		slog.Error("failed to create embedding", "error", err)
 		return nil, err
 	}
 
@@ -85,7 +83,6 @@ func (c *Client) EmbedBatch(ctx context.Context, texts []string) ([][]float32, e
 		},
 	)
 	if err != nil {
-		slog.Error("failed to create embedding", "error", err)
 		return nil, err
 	}
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aepii/argus"
+	"github.com/aepii/argus/internal/config"
 	"github.com/aepii/argus/internal/embed"
 	"github.com/aepii/argus/pb"
 	"google.golang.org/grpc"
@@ -17,13 +18,13 @@ import (
 func TestConcurrentLoad(t *testing.T) {
 	const numGoroutines = 20
 
-	config, err := loadConfig("../../.env")
+	cfg, err := config.LoadClient("../../.env")
 	if err != nil {
-		t.Fatalf("loadConfig failed: %v", err)
+		t.Fatalf("config.LoadClient failed: %v", err)
 	}
 
-	address := config.address
-	port := config.port
+	address := cfg.Address
+	port := cfg.Port
 	target := address + ":" + port
 
 	conn, err := grpc.NewClient(
@@ -40,7 +41,7 @@ func TestConcurrentLoad(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	embedClient, err := embed.NewClient(config.endpoint, config.apiKey, config.apiVersion, config.model, config.dim)
+	embedClient, err := embed.NewClient(cfg.Endpoint, cfg.APIKey, cfg.APIVersion, cfg.Model, cfg.EmbedDim)
 	if err != nil {
 		t.Fatalf("embed.NewClient failed: %v", err)
 	}

@@ -3,6 +3,7 @@ package argus
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/aepii/argus/pb"
 	"google.golang.org/grpc/codes"
@@ -48,6 +49,7 @@ func (s *ShardServer) Upsert(ctx context.Context, req *pb.UpsertRequest) (*pb.Up
 
 	err := store.Upsert(UpsertItem{ID: id, RawText: rawText, Embedding: emb})
 	if err != nil {
+		slog.Error("failed to upsert", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to upsert: %v", err)
 	}
 
@@ -84,7 +86,8 @@ func (s *ShardServer) UpsertBatch(ctx context.Context, req *pb.UpsertBatchReques
 
 	err := store.UpsertBatch(items)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to upsert: %v", err)
+		slog.Error("failed to upsert batch", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to upsert batch: %v", err)
 	}
 
 	return &pb.UpsertBatchResponse{}, nil
@@ -106,6 +109,7 @@ func (s *ShardServer) Search(ctx context.Context, req *pb.SearchRequest) (*pb.Se
 
 	res, err := store.Search(emb, int(req.TopK))
 	if err != nil {
+		slog.Error("failed to search", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to search: %v", err)
 	}
 
@@ -127,6 +131,7 @@ func (s *ShardServer) Count(ctx context.Context, req *pb.CountRequest) (*pb.Coun
 
 	count, err := store.Count()
 	if err != nil {
+		slog.Error("failed to count", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to count: %v", err)
 	}
 
