@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package argus;
+
+option go_package = "github.com/aepii/argus/pb";
+
+service CoordinatorService {
+  rpc Upsert(CoordinatorUpsertRequest) returns (CoordinatorUpsertResponse);
+  rpc UpsertBatch(CoordinatorUpsertBatchRequest) returns (CoordinatorUpsertBatchResponse);
+  rpc Search(CoordinatorSearchRequest) returns (CoordinatorSearchResponse);
+  rpc Count(CoordinatorCountRequest) returns (CoordinatorCountResponse);
+  rpc Heartbeat(CoordinatorHeartbeatRequest) returns (CoordinatorHeartbeatResponse);
+}
+
+message CoordinatorUpsertItem {
+  int64          id        = 1;
+  string         raw_text  = 2;
+  repeated float embedding = 3;
+}
+
+message CoordinatorSearchResult {
+  string raw_text         = 1;
+  double similarity_score = 2;
+}
+
+message CoordinatorUpsertRequest {
+  CoordinatorUpsertItem item = 1;
+}
+
+message CoordinatorUpsertResponse {}
+
+message CoordinatorUpsertBatchRequest {
+  repeated CoordinatorUpsertItem items = 1;
+}
+
+message CoordinatorUpsertBatchResponse {}
+
+message CoordinatorSearchRequest {
+  repeated float embedding = 1;
+  int32          top_k     = 2;
+}
+
+message CoordinatorSearchResponse {
+  repeated CoordinatorSearchResult results = 1;
+}
+
+message CoordinatorCountRequest {}
+
+message CoordinatorCountResponse {
+  int64 count = 1;
+}
+
+message CoordinatorHeartbeatRequest {
+  string shard_id = 1;
+}
+
+message CoordinatorHeartbeatResponse {}
