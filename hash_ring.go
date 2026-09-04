@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"slices"
+	"sort"
 	"strconv"
 )
 
@@ -44,6 +45,51 @@ func (r *HashRing) RemoveNode(nodeID string) {
 	r.ring = slices.DeleteFunc(r.ring, func(p point) bool {
 		return p.nodeID == nodeID
 	})
+}
+
+func (r *HashRing) Lookup(key string) string {
+	idx := r.startIndex(key)
+
+	return r.ring[idx].nodeID
+}
+
+func (r *HashRing) LookupReplicas(key string, n int) []string {
+	startIdx := r.startIndex(key)
+
+	seen := map[string]struct{}{
+		r.ring[startIdx].nodeID: {},
+	}
+	orderSeen := []string{r.ring[startIdx].nodeID}
+	if len(orderSeen) == n {
+		return orderSeen
+	}
+
+	for i := 1; i < len(r.ring); i++ {
+		idx := (startIdx + i) % len(r.ring)
+		id := r.ring[idx].nodeID
+		if _, exists := seen[id]; !exists {
+			seen[id] = struct{}{}
+			orderSeen = append(orderSeen, id)
+		}
+		if len(orderSeen) == n {
+			break
+		}
+	}
+
+	return orderSeen
+}
+
+func (r *HashRing) startIndex(key string) int {
+	hash := hashKey(key)
+	idx := sort.Search(len(r.ring), func(i int) bool {
+		return r.ring[i].hash >= hash
+	})
+
+	if idx == len(r.ring) {
+		idx = 0
+	}
+
+	return idx
 }
 
 func hashKey(key string) uint64 {
