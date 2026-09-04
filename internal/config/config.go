@@ -33,12 +33,17 @@ type SanityConfig struct {
 	DbPath     string
 }
 
+type CoordinatorConfig struct {
+	VirtualNodes      uint16
+	ReplicationFactor uint16
+}
+
 func LoadServer(filenames ...string) (*ServerConfig, error) {
 	if err := loadConfig(filenames...); err != nil {
 		return nil, err
 	}
 
-	embedDim, err := parseEmbedDim(os.Getenv("EMBEDDING_DIM"))
+	embedDim, err := parseUint16(os.Getenv("EMBEDDING_DIM"), "EMBEDDING_DIM")
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +60,7 @@ func LoadClient(filenames ...string) (*ClientConfig, error) {
 		return nil, err
 	}
 
-	embedDim, err := parseEmbedDim(os.Getenv("EMBEDDING_DIM"))
+	embedDim, err := parseUint16(os.Getenv("EMBEDDING_DIM"), "EMBEDDING_DIM")
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +81,7 @@ func LoadSanity(filenames ...string) (*SanityConfig, error) {
 		return nil, err
 	}
 
-	embedDim, err := parseEmbedDim(os.Getenv("EMBEDDING_DIM"))
+	embedDim, err := parseUint16(os.Getenv("EMBEDDING_DIM"), "EMBEDDING_DIM")
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +96,27 @@ func LoadSanity(filenames ...string) (*SanityConfig, error) {
 	}, nil
 }
 
+func LoadCoordinator(filenames ...string) (*CoordinatorConfig, error) {
+	if err := loadConfig(filenames...); err != nil {
+		return nil, err
+	}
+
+	virtualNodes, err := parseUint16(os.Getenv("VIRTUAL_NODES"), "VIRTUAL_NODES")
+	if err != nil {
+		return nil, err
+	}
+
+	replicationFactor, err := parseUint16(os.Getenv("REPLICATION_FACTOR"), "REPLICATION_FACTOR")
+	if err != nil {
+		return nil, err
+	}
+
+	return &CoordinatorConfig{
+		VirtualNodes:      virtualNodes,
+		ReplicationFactor: replicationFactor,
+	}, nil
+}
+
 func loadConfig(filenames ...string) error {
 	err := godotenv.Load(filenames...)
 	if err != nil && !os.IsNotExist(err) {
@@ -100,12 +126,11 @@ func loadConfig(filenames ...string) error {
 	return nil
 }
 
-func parseEmbedDim(embedDim string) (uint16, error) {
-	dim64, err := strconv.ParseUint(embedDim, 10, 16)
+func parseUint16(v string, name string) (uint16, error) {
+	v64, err := strconv.ParseUint(v, 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("parsing EMBEDDING_DIM %q: %w", embedDim, err)
+		return 0, fmt.Errorf("parsing %q %q: %w", name, v, err)
 	}
 
-	dim16 := uint16(dim64)
-	return dim16, nil
+	return uint16(v64), nil
 }
