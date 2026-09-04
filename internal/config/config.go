@@ -129,7 +129,7 @@ func loadConfig(filenames ...string) error {
 func parseUint16(v string, name string) (uint16, error) {
 	v64, err := strconv.ParseUint(v, 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("parsing %q %q: %w", name, v, err)
+		return 0, fmt.Errorf("parsing %s=%q: %w", name, v, err)
 	}
 
 	return uint16(v64), nil
